@@ -20,7 +20,12 @@
     </v-app-bar>
 
     <v-navigation-drawer v-model="drawer">
-      <!--  -->
+      <h3 style="text-align: center;" class="mt-1">Historique</h3>
+      <v-list>
+        <v-list-item v-for="history in searchHistory" :key="history.villeName" @click="findMeteoWithName(history.villeName,history.latitude,history.longitude)">
+          {{ history.villeName }} / {{ history.latitude }} / {{ history.longitude }}
+        </v-list-item>
+      </v-list>
     </v-navigation-drawer>
 
     <v-main>
@@ -85,6 +90,7 @@ export default {
       drawer: null,
       searchCity: '',
       searchResults: [],
+      searchHistory: [],
       show: false,
       //HomeView
       expand: false,
@@ -100,6 +106,15 @@ export default {
   mounted (){
     // Au lancement de l'application la fonction se lance
     this.getPosition();
+  },
+  created() {
+    // Récupérer l'historique de recherche stocké dans localStorage
+    let storedHistory = localStorage.getItem('searchHistory');
+
+    // Si l'historique existe, mettre à jour la propriété searchHistory du composant
+    if (storedHistory) {
+      this.searchHistory = JSON.parse(storedHistory);
+    }
   },
   methods:
   {
@@ -142,6 +157,7 @@ export default {
     // et la météo d'aujourd'hui et les 3 jours suivant à la position de l'utilisateur
     getPosition(){
       navigator.geolocation.getCurrentPosition((position) => {
+        this.drawer = false;
         this.getCityName(position.coords.latitude, position.coords.longitude)
         this.findMeteo(position.coords.latitude, position.coords.longitude);
         this.updateForecast(position.coords.latitude, position.coords.longitude);
@@ -179,6 +195,17 @@ export default {
     // en fonction du nom de la ville, de la latitude et longitude donnée
     findMeteoWithName(name,latitude, longitude)
     {
+      // Fermer la navbar drawer
+      this.drawer = false;
+      // Ajouter la ville recherchée à l'historique de recherche
+      if (!this.searchHistory.some(history => history.villeName === name) && !this.searchHistory.some(history => history.latitude === latitude) && !this.searchHistory.some(history => history.longitude === longitude)) {
+        this.searchHistory.push({
+        villeName: name,
+        latitude: latitude,
+        longitude: longitude
+        });
+        localStorage.setItem('searchHistory', JSON.stringify(this.searchHistory));
+      }
       axios
         .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current_weather=true&hourly=relativehumidity_2m")
         .then((response) => 
