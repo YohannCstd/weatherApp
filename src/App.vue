@@ -56,10 +56,6 @@
 
         <v-expand-transition>
           <div v-if="expand">
-            <div class="py-2">
-              <v-slider v-model="time" :max="6" :step="1" :ticks="labels" class="mx-4" color="primary" density="compact" hide-details show-ticks="always" thumb-size="10"></v-slider>
-            </div>
-
             <v-list class="bg-transparent">
               <v-list-item v-for="item in forecast" :key="item.day" :title="item.day" :append-icon="item.icon" :subtitle="item.temp"></v-list-item>
             </v-list>
@@ -69,7 +65,7 @@
         <v-divider></v-divider>
 
         <v-card-actions>
-          <v-btn @click="expand = !expand;">
+          <v-btn @click="expand = !expand">
             {{ !expand ? 'Full Report' : 'Hide Report' }}
           </v-btn>
         </v-card-actions>
@@ -92,14 +88,8 @@ export default {
       searchResults: [],
       show: false,
       //HomeView
-      labels: { 0: 'LU', 1: 'MA', 2: 'MER', 3: 'JE', 4: 'VE', 5: 'SA', 6: 'DI' },
       expand: false,
-      time: 0,
-      forecast: [
-        { day: 'Mardi', icon: 'mdi-white-balance-sunny', temp: '24\xB0/12\xB0' },
-        { day: 'Mercredi', icon: 'mdi-white-balance-sunny', temp: '22\xB0/14\xB0' },
-        { day: 'Jeudi', icon: 'mdi-cloud', temp: '25\xB0/15\xB0' },
-      ],
+      forecast: [],
       villeName: "--",
       villeTemperature: "--",
       villeVent: "--",
@@ -139,7 +129,7 @@ export default {
       navigator.geolocation.getCurrentPosition((position) => {
         this.getCityName(position.coords.latitude, position.coords.longitude)
         this.findMeteo(position.coords.latitude, position.coords.longitude);
-        this.findMeteoForThreeDay(position.coords.latitude, position.coords.longitude);
+        this.updateForecast(position.coords.latitude, position.coords.longitude);
         this.searchCity = '';
       });
     },
@@ -149,6 +139,8 @@ export default {
         .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current_weather=true&hourly=relativehumidity_2m")
         .then((response) => 
         {
+          // Mise à jour de forecast
+          this.updateForecast(latitude,longitude);
           //Fermeture de la searchbar
           if(this.show) this.show =false;
           //Ajout des valeurs de la temparature et du vent en fonction de la réponse de l'API
@@ -171,6 +163,8 @@ export default {
         .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current_weather=true&hourly=relativehumidity_2m")
         .then((response) => 
         {
+          // Mise à jour de forecast
+          this.updateForecast(latitude,longitude);
           //Fermeture de la searchbar
           if(this.show) this.show =false;
           this.villeTemperature = response.data.current_weather.temperature;
@@ -187,18 +181,28 @@ export default {
           this.searchResults = [];
         });
     },
-    findMeteoForThreeDay(latitude, longitude)
-    {
-      let url ="https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&start="+"2023-01-26"+"&end="+"2023-01-29"+"&current_weather=true";
+    updateForecast(latitude,longitude) {
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0 = dimanche, 1 = lundi, etc.
+      const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+      const dateStart = new Intl.DateTimeFormat('fr-FR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const threeDaysLater = new Date(today.getTime() + (3 * 24 * 60 * 60 * 1000));
+      const dateEnd = new Intl.DateTimeFormat('fr-FR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(threeDaysLater);
       axios
-        .get(url)
-        .then((response) => 
-        {
-          console.log(response.data);
-        });
-    },
+        .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&start="+dateStart+"&end="+dateEnd+"&daily=temperature_2m_min&daily=temperature_2m_max&timezone=GMT")
+        .then(response => {
+          const tempMax = response.data.daily.temperature_2m_max;
+          const tempMin = response.data.daily.temperature_2m_min;
+          this.forecast = [
+            { day: days[(dayOfWeek + 1) % 7], icon: 'mdi-white-balance-sunny', temp: tempMax[1]+'\xB0/'+tempMin[1]+'\xB0' },
+            { day: days[(dayOfWeek + 2) % 7], icon: 'mdi-white-balance-sunny', temp: tempMax[2]+'\xB0/'+tempMin[2]+'\xB0' },
+            { day: days[(dayOfWeek + 3) % 7], icon: 'mdi-cloud', temp: tempMax[3]+'\xB0/'+tempMin[3]+'\xB0' },
+          ];
+        })
 
-
+      
+      
+  },
 
 
 
