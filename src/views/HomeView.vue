@@ -41,7 +41,6 @@ export default {
         .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current_weather=true&hourly=relativehumidity_2m")
         .then((response) => 
         {
-          console.log(response.data)
           this.villeTemperature = response.data.current_weather.temperature;
           this.villeVent =  response.data.current_weather.windspeed;
 
@@ -52,7 +51,6 @@ export default {
       axios.get(url)
       .then((response) => 
       {
-        console.log(response.data.address);
         this.villeName = response.data.address.city;
       })
     }

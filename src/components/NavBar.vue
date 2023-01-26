@@ -43,7 +43,7 @@ import axios from 'axios'
         .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current_weather=true&hourly=relativehumidity_2m")
         .then((response) => 
         {
-          console.log(response.data)
+         let test = response;
         });
       },
       getPosition(){

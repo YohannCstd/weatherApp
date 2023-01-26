@@ -27,8 +27,8 @@
       <v-card class="mx-auto mt-4" max-width="368">
         <v-card-item :title="this.villeName">
           <template v-slot:subtitle>
-            <v-icon icon="mdi-alert" size="18" color="error" class="mr-1 pb-1"></v-icon>
-            Extreme Weather Alert
+            <v-icon icon="mdi-information-outline" size="18" class="mr-1 pb-1 mt-1"></v-icon>
+            {{ this.descrpWeather }}
           </template>
         </v-card-item>
 
@@ -39,7 +39,7 @@
             </v-col>
 
             <v-col cols="6" class="text-right">
-              <v-icon color="error" icon="mdi-weather-hurricane" size="88"></v-icon>
+              <v-icon color="error" :icon="this.weatherIcon" size="88"></v-icon>
             </v-col>
           </v-row>
         </v-card-text>
@@ -66,7 +66,7 @@
 
         <v-card-actions>
           <v-btn @click="expand = !expand">
-            {{ !expand ? 'Full Report' : 'Hide Report' }}
+            {{ !expand ? 'Rapport complet' : 'Fermer le rapport' }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -76,7 +76,6 @@
 
 <script>
 import axios from 'axios';
-
 
 export default {
   name: 'App',
@@ -91,40 +90,56 @@ export default {
       expand: false,
       forecast: [],
       villeName: "--",
+      descrpWeather: "",
       villeTemperature: "--",
       villeVent: "--",
       villeHumidite: "--",
+      weatherIcon: "",
     }
   },
   mounted (){
+    // Au lancement de l'application la fonction se lance
     this.getPosition();
   },
   methods:
   {
     // Affiche les résultats en dessous de searchbar
-    showResults() {
-        this.show = true
-      },
+    showResults() { this.show = true },
     // Ferme les résultats en dessous de searchbar
-    closeResults() {
-      this.show = false
-    },
+    closeResults() { this.show = false },
+    // J'utilise cette fonction pour l'autocompletion
     findCity() {
+      // Je commence à appeler l'api si la personne a mis au moins 2 caractères
       if(this.searchCity.length >= 2){
       axios
         .get("https://geocoding-api.open-meteo.com/v1/search?name="+this.searchCity+"&language=fr")
         .then((response) => 
         {
+          // L'api me donne les 10 villes en fonction de ce que l'utilisateur a écrit
           this.searchResults = response.data.results;
+          // Et s'il n'y a pas de résultat de retourne une liste vide
           if(this.searchResults == null){
             this.searchResults = [];
           }
         });
       }
+      // Si il y a moins de deux caractères je vide la liste des résultats
       if(this.searchCity.length < 2) {
         this.searchResults = [];
       }
     },
+    // Cette fonction permet de me donner le nom d'une ville en focntion de la latitude et la longitude
+    // Ici elle me sert au démarage de l'application elle me donne le nom de l'endroit ou se situe l'utilisateur
+    getCityName(lat, lng) {
+      axios.get("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="+lat+"&lon="+lng)
+      .then((response) => 
+      {
+        // Ajout du nom de la ville en fonction de l'api
+        this.villeName = response.data.address.city;
+      })
+    },
+    // Cette fonction permet de donner le nom de la ville 
+    // et la météo d'aujourd'hui et les 3 jours suivant à la position de l'utilisateur
     getPosition(){
       navigator.geolocation.getCurrentPosition((position) => {
         this.getCityName(position.coords.latitude, position.coords.longitude)
@@ -133,16 +148,19 @@ export default {
         this.searchCity = '';
       });
     },
+    // Cette fonction permet de donner la météo au démarrage de l'application en fonction de la latitude et longitude donnée
     findMeteo(latitude, longitude)
     {
       axios
         .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current_weather=true&hourly=relativehumidity_2m")
         .then((response) => 
         {
-          // Mise à jour de forecast
-          this.updateForecast(latitude,longitude);
           //Fermeture de la searchbar
           if(this.show) this.show =false;
+          // Message pour décrire la météo
+          this.descrpWeather = this.getDescriptionWeatherCode(response.data.current_weather.weathercode);
+          // Icon pour décrire la météo
+          this.weatherIcon = this.getIconWeatherCode(response.data.current_weather.weathercode);
           //Ajout des valeurs de la temparature et du vent en fonction de la réponse de l'API
           this.villeTemperature = response.data.current_weather.temperature;
           this.villeVent =  response.data.current_weather.windspeed;
@@ -157,6 +175,8 @@ export default {
           this.searchResults = [];
         });
     },
+    // Cette fonction permet de donner la météo quand l'utilisateur utilise la searchbar 
+    // en fonction du nom de la ville, de la latitude et longitude donnée
     findMeteoWithName(name,latitude, longitude)
     {
       axios
@@ -164,7 +184,11 @@ export default {
         .then((response) => 
         {
           // Mise à jour de forecast
-          this.updateForecast(latitude,longitude);
+          this.updateForecast(latitude,longitude)
+          // Message pour décrire la météo
+          this.descrpWeather = this.getDescriptionWeatherCode(response.data.current_weather.weathercode);
+          // Icon pour décrire la météo
+          this.weatherIcon = this.getIconWeatherCode(response.data.current_weather.weathercode);
           //Fermeture de la searchbar
           if(this.show) this.show =false;
           this.villeTemperature = response.data.current_weather.temperature;
@@ -181,42 +205,232 @@ export default {
           this.searchResults = [];
         });
     },
-    updateForecast(latitude,longitude) {
+    dateNowAndThreeday(){
+      // Ici ces lignes de code me permettent d'avoir la date d'aujourd'hui au format yyyy-mm-dd
+      // Ainsi que la date d'en trois jours
       const today = new Date();
-      const dayOfWeek = today.getDay(); // 0 = dimanche, 1 = lundi, etc.
-      const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
       const dateStart = new Intl.DateTimeFormat('fr-FR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
       const threeDaysLater = new Date(today.getTime() + (3 * 24 * 60 * 60 * 1000));
       const dateEnd = new Intl.DateTimeFormat('fr-FR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(threeDaysLater);
+      return {dateStart, dateEnd};
+    },
+    // Cette fonction permet de mettre à jour la météo des 3 jours suivant.
+    updateForecast(latitude,longitude) {
+      // Je vide la météo des trois jours
+      this.forecast = [];
+      // Ces trois lignes permettent de savoir quel jour on est et d'avoir les trois suivant
+      // Ex on est mardi -> mercredi,jeudi,vendredi
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0 = dimanche, 1 = lundi, etc.
+      const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+      let dateStart,dateEnd = this.dateNowAndThreeday();
       axios
-        .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&start="+dateStart+"&end="+dateEnd+"&daily=temperature_2m_min&daily=temperature_2m_max&timezone=GMT")
+        .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&start="+dateStart+"&end="+dateEnd+"&daily=temperature_2m_min&daily=temperature_2m_max&daily=weathercode&timezone=GMT")
         .then(response => {
+          // Les trois variables suivantes me donnes les informations sur les 7 jours avenir
           const tempMax = response.data.daily.temperature_2m_max;
           const tempMin = response.data.daily.temperature_2m_min;
-          this.forecast = [
-            { day: days[(dayOfWeek + 1) % 7], icon: 'mdi-white-balance-sunny', temp: tempMax[1]+'\xB0/'+tempMin[1]+'\xB0' },
-            { day: days[(dayOfWeek + 2) % 7], icon: 'mdi-white-balance-sunny', temp: tempMax[2]+'\xB0/'+tempMin[2]+'\xB0' },
-            { day: days[(dayOfWeek + 3) % 7], icon: 'mdi-cloud', temp: tempMax[3]+'\xB0/'+tempMin[3]+'\xB0' },
-          ];
-        })
-
-      
-      
-  },
-
-
-
-    getCityName(lat, lng) {
-      axios.get("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="+lat+"&lon="+lng)
-      .then((response) => 
-      {
-        // Ajout du nom de la ville en fonction de l'api
-        this.villeName = response.data.address.city;
-        // Vide la searchbar
-        this.searchCity = '';
-        this.searchResults = [];
-      })
+          const weatherCode = response.data.daily.weathercode;
+          // Dans mon for j'ai mis le i = 1 car le 0 est le jour d'aujourd'hui
+          // Puis j'ai mis 4 car je veux que les trois jours suivants
+          for (let i = 1; i < 4; i++) {    
+            let jour = {
+              day: days[(dayOfWeek + i) % 7],
+              icon: this.getIconWeatherCode(weatherCode[i]),
+              temp: tempMax[i]+'\xB0/'+tempMin[i]+'\xB0'
+            }
+            this.forecast.push(jour);
+          }
+        })  
+    },
+    // Cette fonction permet d'interpreter le weatherCode renvoyé par l'api et ainsi envoyé la bonne icone
+    getIconWeatherCode(code){
+    let icon;
+    switch (code) {
+      case 0:
+        icon = "mdi-weather-sunny";
+        break;
+      case 1:
+        icon = "mdi-weather-partly-cloudy";
+        break;
+      case 2:
+        icon = "mdi-weather-partly-cloudy";
+        break;
+      case 3:
+        icon = "mdi-weather-partly-cloudy";
+        break;
+      case 45:
+        icon = "mdi-weather-fog";
+        break;
+      case 48:
+        icon = "mdi-weather-fog";
+        break;
+      case 51:
+        icon = "mdi-weather-rainy";
+        break;
+      case 53:
+        icon = "mdi-weather-rainy";
+        break;
+      case 55:
+        icon = "mdi-weather-rainy";
+        break;
+      case 56:
+        icon = "mdi-weather-snowy-rainy";
+        break;
+      case 57:
+        icon = "mdi-weather-snowy-rainy";
+        break;
+      case 61:
+        icon = "mdi-weather-pouring";
+        break;
+      case 63:
+        icon = "mdi-weather-pouring";
+        break;
+      case 65:
+        icon = "mdi-weather-pouring";
+        break;
+      case 66:
+        icon = "mdi-weather-hail";
+        break;
+      case 67:
+        icon = "mdi-weather-hail";
+        break;
+      case 71:
+        icon = "mdi-weather-snowy";  
+        break;
+      case 73:
+        icon = "mdi-weather-snowy";  
+        break;
+      case 75:
+        icon = "mdi-weather-snowy";  
+        break;
+      case code == 77:
+        icon = "mdi-weather-hail";
+        break;
+      case 80:
+        icon = "mdi-weather-lightning-rainy";
+        break;
+      case 81:
+        icon = "mdi-weather-lightning-rainy";
+        break;
+      case 82:
+        icon = "mdi-weather-lightning-rainy";
+        break;
+      case 85:
+        icon = "mdi-weather-snowy-rainy";
+        break;
+      case 86:
+        icon = "mdi-weather-snowy-rainy";
+        break;
+      case code == 95:
+        icon = "mdi-weather-lightning";
+        break;
+      case 96:
+        icon = "mdi-weather-hail";
+        break;
+      case 99:
+        icon = "mdi-weather-hail";
+        break;
+      default:
+        icon = "";
+        break;
     }
+    return icon;
+    },
+    // Cette fonction permet d'interpreter le weatherCode renvoyé par l'api et ainsi envoyé la bonne description
+    getDescriptionWeatherCode(code){
+    let description = "";
+    switch (code) {
+      case 0:
+        description = "Ciel clair";
+        break;
+      case 1:
+        description = "Plutôt dégagé";
+        break;
+      case 2:
+        description = "Partiellement nuageux"
+        break;
+      case 3:
+        description = "Couvert";
+        break;
+      case 45:
+        description = "Brouillard";
+        break;
+      case 48:
+        description = "Dépôt de brouillard givré";
+        break;
+      case 51:
+        description = "Bruine légère";
+        break;
+      case 53:
+        description = "Bruine modérée"
+        break;
+      case 55:
+        description = "Bruine dense";
+        break;
+      case 56:
+        description = "Légère bruine verglaçante";
+        break;
+      case 57:
+        description = "Dense bruine verglaçante";
+        break;
+      case 61:
+        description = "Pluie faible";
+        break;
+      case 63:
+        description = "Pluie modérée";
+        break;
+      case 65:
+        description = "Forte pluie";
+        break;
+      case 66:
+        description = "Légère pluie verglaçante";
+        break;
+      case 67:
+        description = "Forte pluie verglaçante";
+        break;
+      case 71:
+        description = "Légère chute de neige";  
+        break;
+      case 73:
+        description = "Chute de neige modérée";
+        break;
+      case 75:
+        description = "Forte chute de neige";
+        break;
+      case 77:
+        description = "grêle";
+        break;
+      case 80:
+        description = "Légères averses de pluie";
+        break;
+      case 81:
+        description = "Averses de pluie modérées";
+        break;
+      case 82:
+        description = "Violentes averses de pluie";
+        break;
+      case 85:
+        description = "Légères averses de neige";
+        break;
+      case 86:
+        description = "Fortes averses de neige";
+        break;
+      case 95:
+        description = "Orage";
+        break;
+      case 96:
+        description = "Orage avec grêle légère";
+        break;
+      case 99:
+        description = "Orage avec grêle forte";
+        break;
+      default:
+        description = "";
+        break;
+    }
+    return description;
+    },
   }
 }
 </script>
@@ -235,7 +449,6 @@ export default {
   right: 58px;
   margin-top: 2px;
 }
-
 .close-results {
   background: transparent;
   width: 100vw;
