@@ -7,8 +7,8 @@
 
           <div class="close-results" @click="closeResults" v-if="searchResults.length > 0 && show">
             <v-list class="v-list-searchbar" @click.stop>
-              <v-list-item @click="findMeteoWithName(result.name,result.latitude,result.longitude)" v-for="result in searchResults" :key="result.id">
-                {{ result.name }} - {{ result.timezone }}
+              <v-list-item @click="findMeteoWithName(result.name,result.latitude,result.longitude,result.country_code,result.admin1)" v-for="result in searchResults" :key="result.id">
+                {{ result.name }} - {{ result.admin1 }} ({{ result.country_code }})
               </v-list-item>
             </v-list>
           </div>
@@ -21,9 +21,12 @@
 
     <v-navigation-drawer v-model="drawer">
       <h3 style="text-align: center;" class="mt-1">Historique</h3>
+      <div v-if="searchHistory.length == 0" style="text-align: center;">
+        <p>Votre historique est vide !</p>
+      </div>
       <v-list>
-        <v-list-item v-for="history in searchHistory" :key="history.villeName" @click="findMeteoWithName(history.villeName,history.latitude,history.longitude)">
-          {{ history.villeName }} / {{ history.latitude }} / {{ history.longitude }}
+        <v-list-item class="v-list-close" v-for="history in searchHistory" :key="history" @click="findMeteoWithName(history.villeName,history.latitude,history.longitude,history.countryCode,history.department)">
+          {{ history.villeName }} - {{ history.department }} ({{ history.countryCode }}) <v-icon @click="removeCityFromHistory(history)" class="ml-2" small>mdi-close</v-icon>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
@@ -157,7 +160,6 @@ export default {
     // et la météo d'aujourd'hui et les 3 jours suivant à la position de l'utilisateur
     getPosition(){
       navigator.geolocation.getCurrentPosition((position) => {
-        this.drawer = false;
         this.getCityName(position.coords.latitude, position.coords.longitude)
         this.findMeteo(position.coords.latitude, position.coords.longitude);
         this.updateForecast(position.coords.latitude, position.coords.longitude);
@@ -167,6 +169,7 @@ export default {
     // Cette fonction permet de donner la météo au démarrage de l'application en fonction de la latitude et longitude donnée
     findMeteo(latitude, longitude)
     {
+      this.drawer = false;
       axios
         .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current_weather=true&hourly=relativehumidity_2m")
         .then((response) => 
@@ -193,19 +196,12 @@ export default {
     },
     // Cette fonction permet de donner la météo quand l'utilisateur utilise la searchbar 
     // en fonction du nom de la ville, de la latitude et longitude donnée
-    findMeteoWithName(name,latitude, longitude)
+    findMeteoWithName(name,latitude, longitude,countryCode,department)
     {
       // Fermer la navbar drawer
       this.drawer = false;
       // Ajouter la ville recherchée à l'historique de recherche
-      if (!this.searchHistory.some(history => history.villeName === name) && !this.searchHistory.some(history => history.latitude === latitude) && !this.searchHistory.some(history => history.longitude === longitude)) {
-        this.searchHistory.push({
-        villeName: name,
-        latitude: latitude,
-        longitude: longitude
-        });
-        localStorage.setItem('searchHistory', JSON.stringify(this.searchHistory));
-      }
+      this.addInLocalStorage(name,department,latitude,longitude,countryCode),
       axios
         .get("https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current_weather=true&hourly=relativehumidity_2m")
         .then((response) => 
@@ -458,10 +454,33 @@ export default {
     }
     return description;
     },
+    // Ajouter la ville recherchée à l'historique de recherche et en première ligne du tableau
+    addInLocalStorage(name,department,latitude,longitude,countryCode){
+      // Si la ville est déja dans l'historique on la supprime
+      if (this.searchHistory.some(history => history.villeName === name) && this.searchHistory.some(history => history.latitude === latitude) && this.searchHistory.some(history => history.longitude === longitude)) {
+        let index = this.searchHistory.findIndex(history => history.villeName === name && history.latitude === latitude && history.longitude === longitude);
+        this.searchHistory.splice(index, 1);
+      }  
+      // On ajoute la ville en première ligne du tableau
+      this.searchHistory.unshift({
+        villeName: name,
+        department: department,
+        latitude: latitude,
+        longitude: longitude,
+        countryCode: countryCode
+      });
+      localStorage.setItem('searchHistory', JSON.stringify(this.searchHistory));
+    },
+    // La fonction permet de supprimer une ville qui se trouve dans l'historique
+    removeCityFromHistory(history) {
+      let index = this.searchHistory.indexOf(history);
+      this.searchHistory.splice(index, 1);
+      localStorage.setItem('searchHistory', JSON.stringify(this.searchHistory));
+    },
   }
 }
 </script>
-<style scoped>
+<style>
 .v-toolbar{
   overflow: visible;
 }
@@ -482,5 +501,11 @@ export default {
   height: 100vh;
   position: absolute;
   right: -58px;
+}
+
+.v-list-close > .v-list-item__content {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
 }
 </style>
