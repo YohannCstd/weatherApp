@@ -1,6 +1,6 @@
 # mobile-app
 
-Mon application météo
+Mon application météo.
 
 ## Pour commencer
 ```
