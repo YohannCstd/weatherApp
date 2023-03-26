@@ -1,24 +1,13 @@
 # mobile-app
 
-## Project setup
+Mon application météo.
+
+## Pour commencer
 ```
-npm install
+npm install puis ensuite npm run serve
 ```
 
-### Compiles and hot-reloads for development
-```
-npm run serve
-```
+## Fonctionnalités
 
-### Compiles and minifies for production
-```
-npm run build
-```
-
-### Lints and fixes files
-```
-npm run lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+L'application permet d'obtenir la météo grâce à la géolocalisation ou en entrant le nom d'une ville. Les prévisions sont disponibles par heure et pour une période de 3 jours.
+Il y a aussi l'historique qui est mis en place.
